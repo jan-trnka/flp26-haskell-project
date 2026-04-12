@@ -10,6 +10,7 @@ where
 
 import Options.Applicative
 import SOLTest.Types
+import SOLTest.Filter (trimFilterId)
 
 -- | Parse command-line arguments into an 'Options' record.
 -- Exits with a help message on @--help@ or on invalid arguments.
@@ -151,7 +152,27 @@ filterSpecParser =
 
 -- | Assemble raw filter string lists into a 'FilterSpec'.
 --
--- FLP: Implement this function (read the long comment above first).
+-- Parameters:
+--
+-- * @include@: IDs for @-i@/@--include@
+-- * @exclude@: IDs for @-e@/@--exclude@
+-- * @ic@: IDs for @--ic@
+-- * @it@: IDs for @--it@
+-- * @ec@: IDs for @--ec@
+-- * @et@: IDs for @--et@
+--
+-- Output is a 'FilterSpec' with includes and excludes as 'FilterCriterion' lists,
+-- and regex disabled. Each string is trimmed and non-empty ones are converted
+-- to appropriate 'FilterCriterion' constructors.
 
--- buildFilterSpec :: ??? -> FilterSpec
--- buildFilterSpec ???
+buildFilterSpec :: [String] -> [String] -> [String] -> [String] -> [String] -> [String] -> FilterSpec
+buildFilterSpec include exclude ic it ec et =
+  FilterSpec
+    { fsIncludes = mkAny include ++ mkCategory ic ++ mkTag it
+    , fsExcludes = mkAny exclude ++ mkCategory ec ++ mkTag et
+    , fsUseRegex = False
+    }
+  where
+    mkAny = map ByAny . filter (not . null) . map trimFilterId
+    mkCategory = map ByCategory . filter (not . null) . map trimFilterId
+    mkTag = map ByTag . filter (not . null) . map trimFilterId
