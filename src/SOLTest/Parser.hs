@@ -78,7 +78,11 @@ emptyHeader =
 --
 -- FLP: Implement this function.
 splitHeaderBody :: String -> ([String], String)
-splitHeaderBody content = undefined
+splitHeaderBody content =
+  let lines' = lines content                          -- Split content into lines.
+      (hdrLines, rest) = break (all isSpace) lines'   -- Break at the first empty line.
+      body = unlines $ dropWhile (all isSpace) rest   -- Join the remaining lines as body, skipping empty lines.
+   in (hdrLines, body)
 
 -- ---------------------------------------------------------------------------
 -- Header line parsing
@@ -95,8 +99,28 @@ parseHeaderLine :: ParsedHeader -> String -> Either String ParsedHeader
 parseHeaderLine hdr line
   | "*** " `isPrefixOf` line =
       let val = trim (drop 4 line)
-       in Right hdr {phDescription = Just val}
-  -- ???
+      in Right hdr {phDescription = Just val}
+  | "+++ " `isPrefixOf` line =
+      let val = trim (drop 4 line)
+      in Right hdr {phCategory = Just val}
+  | "--- " `isPrefixOf` line =
+      let val = trim (drop 4 line)
+      in Right hdr {phTags = phTags hdr ++ [val]}
+  | ">>> " `isPrefixOf` line =
+      let valS = trim (drop 4 line)
+      in case reads valS :: [(Int, String)] of
+           [(val, "")] -> Right hdr {phWeight = Just val}                                   -- Successfully parsed an integer weight.
+           _ -> Left $ "Invalid weight value: " ++ valS                                     -- Known prefix but malformed integer value.
+  | "!C! " `isPrefixOf` line =
+      let valS = trim (drop 4 line)
+      in case reads valS :: [(Int, String)] of
+           [(val, "")] -> Right hdr {phParserCodes = phParserCodes hdr ++ [val]}            -- Successfully parsed an integer Parser code.
+           _ -> Left $ "Invalid parser exit code: " ++ valS                                 -- Known prefix but malformed integer value.
+  | "!I! " `isPrefixOf` line =
+      let valS = trim (drop 4 line)
+      in case reads valS :: [(Int, String)] of
+           [(val, "")] -> Right hdr {phInterpreterCodes = phInterpreterCodes hdr ++ [val]}  -- Successfully parsed an integer Interpreter code.
+           _ -> Left $ "Invalid interpreter exit code: " ++ valS                            -- Known prefix but malformed integer value.
   | otherwise = Right hdr -- unknown or comment line: skip
 
 -- | Parse all header lines into a 'ParsedHeader'.
@@ -190,7 +214,15 @@ parseTestFile tcf content = do
 --
 -- FLP: Implement this function.
 buildExitCodes :: TestCaseType -> ParsedHeader -> (Maybe [Int], Maybe [Int])
-buildExitCodes = undefined
+buildExitCodes testType hdr =
+  case testType of
+    -- Parser codes from header, no interpreter codes.
+    ParseOnly -> (Just $ phParserCodes hdr, Nothing)
+    -- Interpreter codes from header, no parser codes.
+    ExecuteOnly -> (Nothing, Just $ phInterpreterCodes hdr)
+    -- Both parser and interpreter codes.
+    -- Check if parser codes are empty or given explicitly.
+    Combined -> (if null (phParserCodes hdr) then Nothing else Just (phParserCodes hdr), Just (phInterpreterCodes hdr))
 
 -- ---------------------------------------------------------------------------
 -- Utilities
