@@ -36,12 +36,18 @@ filterTests ::
   FilterSpec ->
   [TestCaseDefinition] ->
   ([TestCaseDefinition], [TestCaseDefinition])
-filterTests spec tests = undefined
+filterTests spec tests = 
+  let included = if null (fsIncludes spec)                          -- No include criteria means include all tests.
+                 then tests
+                 else filter (matchesAny (fsIncludes spec)) tests   -- Filter tests by include criteria.
+      excluded = filter (matchesAny (fsExcludes spec)) included     -- Filter the included tests by exclude criteria.
+      selected = filter (`notElem` excluded) included               -- Selected tests are included but not excluded.
+  in (selected, excluded)
 
 -- | Check whether a test matches at least one criterion in the list.
-matchesAny :: Bool -> [FilterCriterion] -> TestCaseDefinition -> Bool
-matchesAny useRegex criteria test =
-  any (matchesCriterion useRegex test) criteria
+matchesAny :: [FilterCriterion] -> TestCaseDefinition -> Bool
+matchesAny criteria test =
+  any (matchesCriterion test) criteria
 
 -- | Check whether a test matches a single 'FilterCriterion'.
 --
@@ -52,8 +58,15 @@ matchesAny useRegex criteria test =
 -- FLP: Implement this function. If you're not implementing the regex matching
 -- bonus extension, you can either remove the first argument and update the usages,
 -- or you can simply ignore the value.
-matchesCriterion :: Bool -> TestCaseDefinition -> FilterCriterion -> Bool
-matchesCriterion useRegex test criterion = undefined
+matchesCriterion :: TestCaseDefinition -> FilterCriterion -> Bool
+matchesCriterion test criterion = do
+  case criterion of
+    -- @ByAny@ matches if the criterion matches the test name, category, or tag.
+    ByAny crit -> tcdName test == crit || tcdCategory test == crit || crit `elem` tcdTags test
+    -- @ByCategory@ matches if the criterion matches the test category.
+    ByCategory cat -> tcdCategory test == cat
+    -- @ByTag@ matches if the criterion tag is in the test's tags.
+    ByTag tag -> tag `elem` tcdTags test
 
 -- | Trim leading and trailing whitespace from a filter identifier.
 trimFilterId :: String -> String
