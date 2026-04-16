@@ -47,7 +47,7 @@ filterTests spec tests =
 -- | Check whether a test matches at least one criterion in the list.
 matchesAny :: [FilterCriterion] -> TestCaseDefinition -> Bool
 matchesAny criteria test =
-  any (matchesCriterion test) criteria
+  any (matchesCriterion False test) criteria
 
 -- | Check whether a test matches a single 'FilterCriterion'.
 --
@@ -58,8 +58,8 @@ matchesAny criteria test =
 -- FLP: Implement this function. If you're not implementing the regex matching
 -- bonus extension, you can either remove the first argument and update the usages,
 -- or you can simply ignore the value.
-matchesCriterion :: TestCaseDefinition -> FilterCriterion -> Bool
-matchesCriterion test criterion = do
+matchesCriterion :: Bool -> TestCaseDefinition -> FilterCriterion -> Bool
+matchesCriterion useRegex test criterion = do
   case criterion of
     -- @ByAny@ matches if the criterion matches the test name, category, or tag.
     ByAny crit -> tcdName test == crit || tcdCategory test == crit || crit `elem` tcdTags test
