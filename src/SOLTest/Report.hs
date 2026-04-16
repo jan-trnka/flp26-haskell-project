@@ -67,25 +67,34 @@ groupByCategory ::
   Map String CategoryReport
 groupByCategory definitions = Map.foldlWithKey' updateCategoryMap Map.empty
   where
+    -- Lookup map from test name to definition.
     defMap = Map.fromList [(tcdName d, d) | d <- definitions]
+    -- Update the category report map with a single test result.
     updateCategoryMap acc name report =
-      let def = fromMaybe (error $ "Definition not found for test: " ++ name) (Map.lookup name defMap)
-          cat = tcdCategory def
-          pts = tcdPoints def
+      let
+        -- Test definition must exist for executed tests; if not, this is a logic error in the program.
+        def = fromMaybe (error $ "Definition not found for test: " ++ name) (Map.lookup name defMap)
+        -- Extract category and points from the test definition.
+        cat = tcdCategory def
+        -- Points for this test case.
+        pts = tcdPoints def
+        -- Points earned for this test case (0 if failed, full points if passed).
+        earned = if tcrResult report == Passed then pts else 0
         
-          earned = if tcrResult report == Passed then pts else 0
-        
-          newReport = CategoryReport
-            { crTotalPoints  = pts
-            , crPassedPoints = earned
-            , crTestResults  = Map.singleton name report
-            }
+        -- Create a new category report for this test result.
+        newReport = CategoryReport
+          { crTotalPoints  = pts
+          , crPassedPoints = earned
+          , crTestResults  = Map.singleton name report
+          }
           
-          combine old new = CategoryReport
-            { crTotalPoints  = crTotalPoints old  + crTotalPoints new
-            , crPassedPoints = crPassedPoints old + crPassedPoints new
-            , crTestResults  = Map.union (crTestResults old) (crTestResults new)
-            }
+        -- Combine with existing category report if it exists.
+        combine old new = CategoryReport
+          { crTotalPoints  = crTotalPoints old  + crTotalPoints new
+          , crPassedPoints = crPassedPoints old + crPassedPoints new
+          , crTestResults  = Map.union (crTestResults old) (crTestResults new)
+          }
+      -- Insert or combine the new report into the category map.
       in Map.insertWith combine cat newReport acc
 
 -- ---------------------------------------------------------------------------
@@ -107,10 +116,10 @@ computeStats ::
   TestStats
 computeStats foundCount loadedCount selectedCount mCategoryResults =
   let allReports = case mCategoryResults of
-        Nothing -> []
-        Just catMap -> concatMap (Map.elems . crTestResults) (Map.elems catMap)
-      passCount = length [ r | r <- allReports, tcrResult r == Passed ]
-      histogram = computeHistogram $ fromMaybe Map.empty mCategoryResults
+        Nothing -> []                                                           -- No results in dry-run mode, so no reports to count.
+        Just catMap -> concatMap (Map.elems . crTestResults) (Map.elems catMap) -- Flatten all test reports from all categories into a single list.
+      passCount = length [ r | r <- allReports, tcrResult r == Passed ]         -- Count how many tests passed.
+      histogram = computeHistogram $ fromMaybe Map.empty mCategoryResults       -- Compute histogram from category reports.
 
   in TestStats
     { tsFoundTestFiles = foundCount
@@ -137,19 +146,23 @@ computeStats foundCount loadedCount selectedCount mCategoryResults =
 -- FLP: Implement this function.
 computeHistogram :: Map String CategoryReport -> Map String Int
 computeHistogram categories =
-  let initialBins = Map.fromList [ (rateToBin (fromIntegral i / 10.0), 0) | i <- [0..9 :: Int] ]
-      rates = map calculateRate (Map.elems categories)
-      binKeys = map rateToBin rates
+  let initialBins = Map.fromList [ (rateToBin (fromIntegral i / 10.0), 0) | i <- [0..9 :: Int] ]  -- Initialize bins with keys "0.0", "0.1", ..., "0.9" and counts 0.
+      rates = map calculateRate (Map.elems categories)                                            -- Calculate pass rates for each category.
+      binKeys = map rateToBin rates                                                               -- Map each rate to its corresponding bin key.
+  -- Accumulate counts for each bin key.
   in foldl' (\acc key -> Map.insertWith (+) key 1 acc) initialBins binKeys
 
+-- | Helper function to calculate the pass rate for a category report.
+--
+-- @cat@ = 'CategoryReport' for which to calculate the pass rate.
 calculateRate :: CategoryReport -> Double
 calculateRate cat =
-    let results = Map.elems (crTestResults cat)
-        total = length results
-        passed = length [ r | r <- results, tcrResult r == Passed ]
+    let results = Map.elems (crTestResults cat)                     -- Get all test results for this category.
+        total = length results                                      -- Total number of tests in this category.
+        passed = length [ r | r <- results, tcrResult r == Passed ] -- Count of passed tests in this category.
     in if total == 0 
        then 0.0 
-       else fromIntegral passed / fromIntegral total
+       else fromIntegral passed / fromIntegral total                -- Calculate pass rate.
 
 -- | Map a pass rate in @[0, 1]@ to a histogram bin key.
 --
