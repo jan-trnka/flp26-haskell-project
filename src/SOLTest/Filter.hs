@@ -17,6 +17,7 @@ where
 
 import Data.Char (isSpace)
 import SOLTest.Types
+import Data.List (partition)
 
 -- ---------------------------------------------------------------------------
 -- Public API
@@ -36,13 +37,16 @@ filterTests ::
   FilterSpec ->
   [TestCaseDefinition] ->
   ([TestCaseDefinition], [TestCaseDefinition])
-filterTests spec tests = 
-  let included = if null (fsIncludes spec)                          -- No include criteria means include all tests.
-                 then tests
-                 else filter (matchesAny (fsIncludes spec)) tests   -- Filter tests by include criteria.
-      excluded = filter (matchesAny (fsExcludes spec)) included     -- Filter the included tests by exclude criteria.
-      selected = filter (`notElem` excluded) included               -- Selected tests are included but not excluded.
-  in (selected, excluded)
+filterTests spec = partition isSelected
+  where
+    isSelected t =
+      let
+        -- A test is selected if it matches the include criteria (or if there are no include criteria)
+        -- and does not match any exclude criteria.
+        isIncluded = null (fsIncludes spec) || matchesAny (fsIncludes spec) t
+        isNotExcluded = not (matchesAny (fsExcludes spec) t)
+      in
+        isIncluded && isNotExcluded
 
 -- | Check whether a test matches at least one criterion in the list.
 matchesAny :: [FilterCriterion] -> TestCaseDefinition -> Bool
