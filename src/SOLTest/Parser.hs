@@ -81,7 +81,10 @@ splitHeaderBody :: String -> ([String], String)
 splitHeaderBody content =
   let lines' = lines content                          -- Split content into lines.
       (hdrLines, rest) = break (all isSpace) lines'   -- Break at the first empty line.
-      body = unlines $ dropWhile (all isSpace) rest   -- Join the remaining lines as body, skipping empty lines.
+
+      body = case rest of
+        [] -> ""                                      -- No empty line found, so body is empty.
+        (_:bodyLines) -> unlines bodyLines            -- Skip the empty line and join the rest as body.
    in (hdrLines, body)
 
 -- ---------------------------------------------------------------------------
