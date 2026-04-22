@@ -58,13 +58,15 @@ matchesAny criteria test =
 -- regular expression matched against the relevant field(s).
 matchesCriterion :: Bool -> TestCaseDefinition -> FilterCriterion -> Bool
 matchesCriterion useRegex test criterion = do
-  case criterion of
-    -- @ByAny@ matches if the criterion matches the test name, category, or tag.
-    ByAny crit -> tcdName test == crit || tcdCategory test == crit || crit `elem` tcdTags test
-    -- @ByCategory@ matches if the criterion matches the test category.
-    ByCategory cat -> tcdCategory test == cat
-    -- @ByTag@ matches if the criterion tag is in the test's tags.
-    ByTag tag -> tag `elem` tcdTags test
+  not useRegex  -- Regex matching not implemented.
+  &&
+    case criterion of
+      -- @ByAny@ matches if the criterion matches the test name, category, or tag.
+      ByAny crit -> tcdName test == crit || tcdCategory test == crit || crit `elem` tcdTags test
+      -- @ByCategory@ matches if the criterion matches the test category.
+      ByCategory cat -> tcdCategory test == cat
+      -- @ByTag@ matches if the criterion tag is in the test's tags.
+      ByTag tag -> tag `elem` tcdTags test
 
 -- | Trim leading and trailing whitespace from a filter identifier.
 trimFilterId :: String -> String
