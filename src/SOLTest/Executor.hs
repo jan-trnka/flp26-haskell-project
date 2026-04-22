@@ -98,21 +98,24 @@ executeExecuteOnly interpPath test =
         }
 
 -- | Execute a 'Combined' test case.
---
--- FLP: Implement this function. You'll use @withTempSource@ here.
 executeCombined :: FilePath -> FilePath -> TestCaseDefinition -> IO TestCaseReport
 executeCombined parserPath interpPath test = do
+  -- Run the parser first.
   (pExitCode, pOut, pErr) <- runParser parserPath (tcdSourceCode test)
   let pCode = exitCodeToInt pExitCode
 
   case pCode of
+    -- Parser suceeded, run the interpreter with the parser's output as source.
     0 -> withTempSource pOut $ \tmpPath -> do
           (iExitCode, iOut, iErr) <- runInterpreter interpPath tmpPath (tcdStdinFile test)
           let iCode = exitCodeToInt iExitCode
+              -- Get the expected interpreter exit codes from the test.
               expectedCodes = fromMaybe [] (tcdExpectedInterpreterExitCodes test)
 
+          -- If the interpreter's exit code is from expected codes, check the output (if @.out@ is present).
           (result, diffOut) <- checkInterpreterResult iCode expectedCodes iOut (tcdExpectedStdoutFile test)
 
+          -- Return the final report with all collected information.
           return TestCaseReport
             { tcrResult = result,
               tcrParserExitCode = Just pCode,
@@ -123,6 +126,7 @@ executeCombined parserPath interpPath test = do
               tcrInterpreterStderr = Just iErr,
               tcrDiffOutput = diffOut
             }
+    -- Parser failed, return 'ParseFail'.
     _ -> return TestCaseReport
           { tcrResult = ParseFail,
             tcrParserExitCode = Just pCode,
@@ -175,8 +179,6 @@ runDiff actualFile expectedFile = do
 --
 -- Runs diff only when the interpreter exited with code 0 AND a @.out@ file
 -- is present.
---
--- FLP: Implement this function.
 checkInterpreterResult ::
   -- | Actual interpreter exit code.
   Int ->
@@ -214,14 +216,14 @@ withTempSource content action =
 
 -- | Write the interpreter stdout to a temp file and diff it against @.out@.
 -- The file is deleted when the action returns.
---
--- FLP: Implement this function. It will start similarly to @withTempSource@.
 runDiffOnOutput :: String -> FilePath -> IO (TestResult, Maybe String)
 runDiffOnOutput iOut outFile =
+  -- Write the interpreter output to a temporary file.
   withSystemTempFile "sol-iOut.out" $ \tmpPath tmpHandle -> do
     hPutStr tmpHandle iOut
     hClose tmpHandle
     
+    -- Run diff between the temp file and the expected output file.
     (exitCode, diffOut) <- runDiff tmpPath outFile
   
     case exitCodeToInt exitCode of
@@ -252,9 +254,6 @@ withExecutable (Just path) action = do
 -- | Check that a file exists and has its executable bit set.
 -- The IO action returns 'Nothing' if the file is usable, or 'Just'
 -- an 'UnexecutedReason' describing the problem.
---
--- FLP: Implement this function. The following functions may come in handy:
---      @doesFileExist@, @getPermissions@, @executable@
 checkExecutable :: FilePath -> IO (Maybe UnexecutedReason)
 checkExecutable path = do
   result <- try (doesFileExist path) :: IO (Either IOException Bool)
